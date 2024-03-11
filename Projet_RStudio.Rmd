@@ -1,0 +1,124 @@
+---
+title: "Projet"
+output: html_document
+date: "2024-02-16"
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(GGally)
+library(plotly)
+library(corrplot)
+library(reshape2)
+library(FactoMineR) 
+library(factoextra)
+library(glmnet) 
+library(ggfortify)
+library(pROC)
+library(ROCR)
+```
+
+
+```{r setup, include=FALSE}
+# Lecture des données
+# path="http://www.math.univ-toulouse.fr/~besse/Wikistat/data/"
+path <- ""
+df <- read.csv(paste(path, "global-data-on-sustainable-energy (1).csv", sep = ""),
+                    sep = ",", dec="." ,header = TRUE)
+# Premières lignes du jeu de données
+head(df)
+# Vérification du contenu
+summary(df)
+# Vérification de la dimension
+view(df)
+```
+
+
+```{r}
+df[,"Year"] <- as.factor(df[,"Year"])
+df[,"Density.n.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.n.P.Km2."])))
+
+summary(df["Density.n.P.Km2."])
+view(df)
+```
+
+```{r}
+library(plyr)
+```
+
+
+```{r}
+for (i in names(df))
+  print(paste(sum(is.na(df[i])/nrow(df)*100) ,":", i))
+```
+```{r}
+new_df <- subset(df, select = -c(Renewable.electricity.generating.capacity.per.capita, Financial.flows.to.developing.countries..US..., Renewables....equivalent.primary.energy.))
+nrow(new_df)
+```
+
+```{r}
+df2 <- na.omit(new_df)
+nrow(df2)
+```
+
+```{r}
+summary(df2)
+```
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+#A compléter : faire des boxplots (si tu veux ^^)
+
+g1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue") 
+g2<-ggplot(df2,aes(x=Access.to.clean.fuels.for.cooking))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue") 
+g3<-ggplot(df2,aes(x=as.integer(Renewable.energy.share.in.the.total.final.energy.consumption....)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g4<-ggplot(df2,aes(x=as.integer(Electricity.from.fossil.fuels..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g5<-ggplot(df2,aes(x=as.integer(Electricity.from.nuclear..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g6<-ggplot(df2,aes(x=as.integer(Electricity.from.renewables..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g7<-ggplot(df2,aes(x=as.integer(Low.carbon.electricity....electricity.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g8<-ggplot(df2,aes(x=as.integer(Primary.energy.consumption.per.capita..kWh.person.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g9<-ggplot(df2,aes(x=as.integer(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g10<-ggplot(df2,aes(x=as.integer(Value_co2_emissions_kt_by_country)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g11<-ggplot(df2,aes(x=as.integer(gdp_growth)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g12<-ggplot(df2,aes(x=as.integer(gdp_per_capita)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g13<-ggplot(df2,aes(x=as.integer(Density.P.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g14<-ggplot(df2,aes(x=as.integer(Land.Area.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+
+grid.arrange(g1,g2, g3,g4,ncol=2)
+grid.arrange(g5,g6,g7,g8,ncol=2)
+grid.arrange(g9, g10, g11, g12, g13, g14, ncol=2)
+rm(g1,g2,g3,g4,g5,g6,g7,g8)
+```
+Transformations possibles : 
+- Quantitative en qualitative (Year)
+- Qualitative en Quantitative (à l'aide d'un seuil)
+- Transformation de var quantitative : log(), sqrt(), ....
+
+
+```{r}
+#Le graphe précedent n'était pas explicite donc on utilise le log pour visualiser des var qui ont des ordres de grandeurs différents
+df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country))
+
+g2<-ggplot(df2,aes(x=Value_co2_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue") 
+
+grid.arrange(g2,ncol=1)
+
+df2$Year <- as.factor(df2$Year)
+```
+
+
+```{r}
+summary(df2)
+```
+
