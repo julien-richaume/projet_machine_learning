@@ -38,9 +38,9 @@ view(df)
 
 ```{r}
 df[,"Year"] <- as.factor(df[,"Year"])
-df[,"Density.n.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.n.P.Km2."])))
+df[,"Density.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.P.Km2."])))
 
-summary(df["Density.n.P.Km2."])
+summary(df["Density.P.Km2."])
 view(df)
 ```
 
@@ -100,9 +100,38 @@ rm(g1,g2,g3,g4,g5,g6,g7,g8)
 ```
 Transformations possibles : 
 - Quantitative en qualitative (Year)
-- Qualitative en Quantitative (à l'aide d'un seuil)
+-  Quantitative en Qualitative  (à l'aide d'un seuil)
 - Transformation de var quantitative : log(), sqrt(), ....
+```{r}
 
+```
+
+```{r}
+b1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
+  geom_boxplot()
+b2<-ggplot(df2,aes(x=Access.to.clean.fuels.for.cooking))+
+  geom_boxplot()
+b3<-ggplot(df2,aes(x=as.integer(Renewable.energy.share.in.the.total.final.energy.consumption....)))+geom_boxplot()
+b4<-ggplot(df2,aes(x=as.integer(Electricity.from.fossil.fuels..TWh.)))+geom_boxplot()
+b5<-ggplot(df2,aes(x=as.integer(Electricity.from.nuclear..TWh.)))+geom_boxplot()
+b6<-ggplot(df2,aes(x=as.integer(Electricity.from.renewables..TWh.)))+geom_boxplot()
+b7<-ggplot(df2,aes(x=as.integer(Low.carbon.electricity....electricity.)))+geom_boxplot()
+b8<-ggplot(df2,aes(x=as.integer(Primary.energy.consumption.per.capita..kWh.person.)))+geom_boxplot()
+b9<-ggplot(df2,aes(x=as.integer(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.)))+geom_boxplot()
+b10<-ggplot(df2,aes(x=as.integer(Value_co2_emissions_kt_by_country)))+geom_boxplot()
+b11<-ggplot(df2,aes(x=as.integer(gdp_growth)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+b12<-ggplot(df2,aes(x=as.integer(gdp_per_capita)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+b13<-ggplot(df2,aes(x=as.integer(Density.P.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+b14<-ggplot(df2,aes(x=as.integer(Land.Area.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+
+grid.arrange(b1,b2, b3,b4,ncol=2)
+grid.arrange(b5,b6,b7,b8,ncol=2)
+grid.arrange(b9, b10, b11, b12, b13, b14, ncol=2)
+rm(b1,b2,b3,b4,b5,b6,b7,b8)
+
+
+
+```
 
 ```{r}
 #Le graphe précedent n'était pas explicite donc on utilise le log pour visualiser des var qui ont des ordres de grandeurs différents
@@ -110,8 +139,11 @@ df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country))
 
 g2<-ggplot(df2,aes(x=Value_co2_log))+
   geom_histogram(aes(y=after_stat(density)))+
-  geom_density(alpha=.2, col="blue") 
+  geom_density(alpha=.2, col="blue")
+```
 
+
+```{r}
 grid.arrange(g2,ncol=1)
 
 df2$Year <- as.factor(df2$Year)
@@ -120,5 +152,29 @@ df2$Year <- as.factor(df2$Year)
 
 ```{r}
 summary(df2)
+```
+
+On créé mtn une variable qui transforte les variable "accesS.." en variable quali en posant un seuil à partir duquel on considere que les pays ont l'acces (voir valeur du seuil ???)
+
+```{r}
+df2[, "Acces_elect"] <- as.factor(df2[, "Access.to.electricity....of.population."] > 50)
+df2[, "Acces_clean_fuel"] <- as.factor(df2[, "Access.to.clean.fuels.for.cooking"] > 50) 
+
+summary(df2)
+```
+
+
+```{r}
+
+```
+# ANALYSE MULTI-DIMENTIONNELLE
+
+graphe de correlations
+```{r}
+```
+
+
+```{r, echo=FALSE}
+
 ```
 
