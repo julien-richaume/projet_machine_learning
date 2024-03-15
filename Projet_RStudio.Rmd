@@ -18,6 +18,7 @@ library(glmnet)
 library(ggfortify)
 library(pROC)
 library(ROCR)
+library(plyr)
 ```
 
 
@@ -32,7 +33,7 @@ head(df)
 # Vérification du contenu
 summary(df)
 # Vérification de la dimension
-view(df)
+#view(df)
 ```
 
 
@@ -41,11 +42,7 @@ df[,"Year"] <- as.factor(df[,"Year"])
 df[,"Density.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.P.Km2."])))
 
 summary(df["Density.P.Km2."])
-view(df)
-```
-
-```{r}
-library(plyr)
+#view(df)
 ```
 
 
@@ -80,7 +77,7 @@ g1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
 g2<-ggplot(df2,aes(x=Access.to.clean.fuels.for.cooking))+
   geom_histogram(aes(y=after_stat(density)))+
   geom_density(alpha=.2, col="blue") 
-g3<-ggplot(df2,aes(x=as.integer(Renewable.energy.share.in.the.total.final.energy.consumption....)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g3<-ggplot(df2,aes(x=as.integer(Renewable.energy.share.in.the.total.final.energy.consumption....)))+geom_histogram(aes(y=after_stat(density)), binwidth=10)+geom_density(alpha=.2, col="blue") 
 g4<-ggplot(df2,aes(x=as.integer(Electricity.from.fossil.fuels..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
 g5<-ggplot(df2,aes(x=as.integer(Electricity.from.nuclear..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
 g6<-ggplot(df2,aes(x=as.integer(Electricity.from.renewables..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
@@ -123,7 +120,7 @@ b11<-ggplot(df2,aes(x=as.integer(gdp_growth)))+geom_histogram(aes(y=after_stat(d
 b12<-ggplot(df2,aes(x=as.integer(gdp_per_capita)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
 b13<-ggplot(df2,aes(x=as.integer(Density.P.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
 b14<-ggplot(df2,aes(x=as.integer(Land.Area.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
-
+  
 grid.arrange(b1,b2, b3,b4,ncol=2)
 grid.arrange(b5,b6,b7,b8,ncol=2)
 grid.arrange(b9, b10, b11, b12, b13, b14, ncol=2)
@@ -134,47 +131,91 @@ rm(b1,b2,b3,b4,b5,b6,b7,b8)
 ```
 
 ```{r}
-#Le graphe précedent n'était pas explicite donc on utilise le log pour visualiser des var qui ont des ordres de grandeurs différents
-df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country))
+#Le graphe précedent n'était pas explicite donc on utilise le log pour visualiser des var qui ont des ordres de grandeurs différents. A la fin, regarder si les transformations ont été pertinentes : comparer les résultats avec les deux df (df2 et df3).
+#On va vouloir ici réaliser des transformations de variables avec la fonction log. Cependant, log(0) renvoie -Inf, donc on doit adapter les données pour pouvoir les visualiser correctement. Vérifions déjà quelles données possèdent des 0.
+sum(df$Value_co2_emissions_kt_by_country==0, na.rm=TRUE)
+sum(df$Electricity.from.nuclear..TWh.==0, na.rm=TRUE)  #3000 variables nulles pour le nucléaire, cette variable ne peut pas être transformée avec log
+sum(df$Electricity.from.renewables..TWh.==0, na.rm=TRUE)
+sum(df$Electricity.from.fossil.fuels..TWh.==0, na.rm=TRUE)
+summary(df$Electricity.from.nuclear..TWh.==0)
+```
 
-g2<-ggplot(df2,aes(x=Value_co2_log))+
+
+```{r}
+eps = 0 #On utilise eps pour décaler les valeurs, et ainsi éviter de faire log(0)=-Inf...
+
+df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country), #Aucun 0 pour cette variable, la transfo log est pertinente et utile.
+                      Nuclear_log = log(Electricity.from.nuclear..TWh. + eps),
+                      Renewables_log = log(Electricity.from.renewables..TWh. + eps),
+                      Fossil_fuels_log = log(Electricity.from.fossil.fuels..TWh. + eps))
+  
+df3 <- df2
+
+g2<-ggplot(df3,aes(x=Value_co2_log))+
+  geom_histogram(aes(y=after_stat(density)), binwidth=1)+
+  geom_density(alpha=.2, col="blue")
+
+g4<-ggplot(df3,aes(x=Fossil_fuels_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g5<-ggplot(df3,aes(x=Nuclear_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g6<-ggplot(df3,aes(x=Renewables_log))+
   geom_histogram(aes(y=after_stat(density)))+
   geom_density(alpha=.2, col="blue")
 ```
 
 
 ```{r}
-grid.arrange(g2,ncol=1)
+grid.arrange(g2,g4,g5,g6,ncol=2)
 
-df2$Year <- as.factor(df2$Year)
+df3$Year <- as.factor(df3$Year)
+```
+```{r}
+# On garde Value_CO2_log, car cette variable nous permet de mieux visualiser les émissions de tous les pays, mais pour les autres, pb de 0.
+df3 <- subset(df3, select = -c(Nuclear_log, Renewables_log, Fossil_fuels_log))
 ```
 
 
 ```{r}
-summary(df2)
+summary(df3)
 ```
 
 On créé mtn une variable qui transforte les variable "accesS.." en variable quali en posant un seuil à partir duquel on considere que les pays ont l'acces (voir valeur du seuil ???)
 
 ```{r}
-df2[, "Acces_elect"] <- as.factor(df2[, "Access.to.electricity....of.population."] > 50)
+df2[, "Acces_elect"] <- as.factor(df2[, "Access.to.electricity....of.population."] > 90)
 df2[, "Acces_clean_fuel"] <- as.factor(df2[, "Access.to.clean.fuels.for.cooking"] > 50) 
 
 summary(df2)
 ```
 
 
-```{r}
+```{r, echo=FALSE}
+library(tidyverse)
 
+pays_pollueurs<- df3 %>% arrange(desc(Value_co2_log)) %>% ## on classe par ordre décroissant
+select(Entity,Value_co2_log) ## on sélectionne les 2 colonnes
+
+pays_pollueurs <- distinct(pays_pollueurs,Entity)
+pays_pollueurs <- pays_pollueurs %>% slice(1:5)
+print(pays_pollueurs)
 ```
 # ANALYSE MULTI-DIMENTIONNELLE
 
 graphe de correlations
 ```{r}
+summary(df3)
 ```
 
+```{r}
+ggpairs(df3[, c(3:19)])
+```
 
-```{r, echo=FALSE}
-
+```{r}
+corrplot(cor(df3[, c(3:5)]),method="ellipse")
 ```
 
