@@ -3,6 +3,9 @@ title: "Projet"
 output: html_document
 date: "2024-02-16"
 ---
+```{r}
+install.packages("factoextra")
+```
 
 ```{r}
 library(ggplot2)
@@ -12,7 +15,7 @@ library(GGally)
 library(plotly)
 library(corrplot)
 library(reshape2)
-library(FactoMineR) 
+library(FactoMineR)
 library(factoextra)
 library(glmnet) 
 library(ggfortify)
@@ -50,6 +53,7 @@ summary(df["Density.P.Km2."])
 for (i in names(df))
   print(paste(sum(is.na(df[i])/nrow(df)*100) ,":", i))
 ```
+
 ```{r}
 new_df <- subset(df, select = -c(Renewable.electricity.generating.capacity.per.capita, Financial.flows.to.developing.countries..US..., Renewables....equivalent.primary.energy.))
 nrow(new_df)
@@ -98,10 +102,7 @@ rm(g1,g2,g3,g4,g5,g6,g7,g8)
 Transformations possibles : 
 - Quantitative en qualitative (Year)
 -  Quantitative en Qualitative  (à l'aide d'un seuil)
-- Transformation de var quantitative : log(), sqrt(), ....
-```{r}
-
-```
+- Transformation de var quantitative : log(), sqrt(), 
 
 ```{r}
 b1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
@@ -142,12 +143,16 @@ summary(df$Electricity.from.nuclear..TWh.==0)
 
 
 ```{r}
-eps = 0 #On utilise eps pour décaler les valeurs, et ainsi éviter de faire log(0)=-Inf...
+eps = 0.1 #On utilise eps pour décaler les valeurs, et ainsi éviter de faire log(0)=-Inf...
 
 df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country), #Aucun 0 pour cette variable, la transfo log est pertinente et utile.
                       Nuclear_log = log(Electricity.from.nuclear..TWh. + eps),
                       Renewables_log = log(Electricity.from.renewables..TWh. + eps),
-                      Fossil_fuels_log = log(Electricity.from.fossil.fuels..TWh. + eps))
+                      Fossil_fuels_log = log(Electricity.from.fossil.fuels..TWh. + eps),
+                      Energy_consumption_log = log(Primary.energy.consumption.per.capita..kWh.person.),
+                      Access_to_electricity_log = log(Renewable.energy.share.in.the.total.final.energy.consumption....))
+
+# On garde Low.carbon.electricity, Access_to_electricity, Access_to_clean_fuels, gdp_growth comme telles.
   
 df3 <- df2
 
@@ -166,14 +171,96 @@ g5<-ggplot(df3,aes(x=Nuclear_log))+
 g6<-ggplot(df3,aes(x=Renewables_log))+
   geom_histogram(aes(y=after_stat(density)))+
   geom_density(alpha=.2, col="blue")
-```
 
+g7<-ggplot(df3,aes(x=Energy_consumption_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
 
-```{r}
-grid.arrange(g2,g4,g5,g6,ncol=2)
+g8<-ggplot(df3,aes(x=Access_to_electricity_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g2,g4,g5,g6,g7,g8,ncol=2)
 
 df3$Year <- as.factor(df3$Year)
 ```
+
+```{r}
+grid.arrange(g2,g4,g5,g6,ncol=2)
+```
+
+```{r}
+# On garde Value_CO2_log, car cette variable nous permet de mieux visualiser les émissions de tous les pays, mais pour les autres, pb de 0.
+df3 <- subset(df3, select = -c(Nuclear_log, Renewables_log, Fossil_fuels_log))
+
+df2 <- df2 %>% mutate(Transformed_variable = log(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.))
+
+
+df3 <- df2
+
+g1<-ggplot(df3,aes(x=Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.))+
+  geom_histogram(aes(y=after_stat(density)), binwidth=1)+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Transformed_variable))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+```
+
+```{r}
+df2 <- df2 %>% mutate(Transformed_variable = log(Density.P.Km2.))
+
+
+df3 <- df2
+
+g1<-ggplot(df3,aes(x=Density.P.Km2.))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Transformed_variable))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+```
+
+```{r}
+df2 <- df2 %>% mutate(Transformed_variable = log(Land.Area.Km2.))
+
+
+df3 <- df2
+
+g1<-ggplot(df3,aes(x=Land.Area.Km2.))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Transformed_variable))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+```
+
+```{r}
+df2 <- df2 %>% mutate(Transformed_variable = log(gdp_per_capita))
+
+
+df3 <- df2
+
+g1<-ggplot(df3,aes(x=gdp_per_capita))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Transformed_variable))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+```
+
+
 ```{r}
 # On garde Value_CO2_log, car cette variable nous permet de mieux visualiser les émissions de tous les pays, mais pour les autres, pb de 0.
 df3 <- subset(df3, select = -c(Nuclear_log, Renewables_log, Fossil_fuels_log))
@@ -191,6 +278,8 @@ df2[, "Acces_elect"] <- as.factor(df2[, "Access.to.electricity....of.population.
 df2[, "Acces_clean_fuel"] <- as.factor(df2[, "Access.to.clean.fuels.for.cooking"] > 50) 
 
 summary(df2)
+
+
 ```
 
 
@@ -212,10 +301,49 @@ summary(df3)
 ```
 
 ```{r}
+ggplot(data.frame(x=df3$Electricity.from.nuclear..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')
+```
+```{r}
+cor.test(df3$Electricity.from.nuclear..TWh., df3$Value_co2_log)
+```
+```{r}
+alpha = 0.05
+
+for (i in 3:length(df3)){
+  for (j in i:length(df3)){
+    test <- cor.test(df3[, i], df3[, j])
+    if (as.numeric(test$p.value) > alpha){
+      ggplot(data.frame(x=df3[, i], y=df3[, j]),aes(x,y))+
+      geom_point(col='blue')
+    }
+  }
+}
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Year, y=df3$Primary.energy.consumption.per.capita..kWh.person.),aes(x,y))+
+geom_point(col='blue')
+```
+
+
+```{r}
+corrplot(cor(df3[, c(3:19)]), 
+         method = "ellipse", 
+         tl.cex = 0.4)
+```
+```{r}
+ggplot(data.frame(x=df3$Access.to.electricity....of.population., y=df3$Renewable.energy.share.in.the.total.final.energy.consumption....),aes(x,y))+
+geom_point(col='blue')
+
+# Var
+```
+
+
+```{r}
 ggpairs(df3[, c(3:19)])
 ```
 
-```{r}
-corrplot(cor(df3[, c(3:5)]),method="ellipse")
-```
+
 
