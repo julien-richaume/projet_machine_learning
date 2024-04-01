@@ -21,7 +21,7 @@ library(glmnet)
 library(ggfortify)
 library(pROC)
 library(ROCR)
-library(plyr)
+library(dplyr)
 ```
 
 
@@ -46,6 +46,7 @@ df[,"Density.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.P.Km2."])))
 
 summary(df["Density.P.Km2."])
 #view(df)
+
 ```
 
 
@@ -72,6 +73,7 @@ summary(df2)
 ```{r}
 library(ggplot2)
 library(gridExtra)
+
 
 #A compléter : faire des boxplots (si tu veux ^^)
 
@@ -209,6 +211,8 @@ g8<-ggplot(df3,aes(x=Transformed_variable))+
 grid.arrange(g1, g8, ncol = 2)
 ```
 
+
+
 ```{r}
 df2 <- df2 %>% mutate(Transformed_variable = log(Density.P.Km2.))
 
@@ -335,15 +339,56 @@ corrplot(cor(df3[, c(3:19)]),
 ```
 ```{r}
 ggplot(data.frame(x=df3$Access.to.electricity....of.population., y=df3$Renewable.energy.share.in.the.total.final.energy.consumption....),aes(x,y))+
-geom_point(col='blue')
-
-# Var
 ```
-
 
 ```{r}
 ggpairs(df3[, c(3:19)])
 ```
 
+```{r}
+geom_point(col='blue')
+```
+```{r}
+library(caret)
 
+# Normalisation avec preProcess
+preproc <- preProcess(df2[, c(3:19)], method = c("center", "scale"))
+df2_stand <- predict(preproc, df2[, c(3:19)])
+
+```
+
+```{r}
+## ACP
+library(FactoMineR)
+ACP_df2 <- PCA(df2_stand, scale.unit = TRUE,
+           graph = FALSE, ncp = 7)
+g1<-fviz_eig(ACP_df2, addlabels = TRUE, ylim = c(0, 40))
+grid.arrange(g1,ncol=1)
+     
+```
+
+```{r}
+# Visualisation des individus sur les deux premières composantes principales
+g2 <- fviz_pca_ind(ACP_df2,
+                   axes = c(2, 3),
+                   col.ind = "cos2", # Color by the quality of representation
+                   gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                   repel = TRUE, # Évite le chevauchement des étiquettes
+                   addEllipses = TRUE, # Ajoute des ellipses de confiance autour des groupes
+                   legend.title = "Cos2")
+
+grid.arrange(g2,ncol=1)
+
+```
+```{r}
+options(repr.plot.width = 9, repr.plot.height = 6)
+
+fviz_pca(ACP_df2, axes=c(1,2), geom = c("point"), col.ind="grey")
+
+     
+```
+```{r}
+#print(ACP_df2)
+summary(ACP_df2)
+```
 
