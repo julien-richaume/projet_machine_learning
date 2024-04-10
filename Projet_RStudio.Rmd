@@ -3,6 +3,9 @@ title: "Projet"
 output: html_document
 date: "2024-02-16"
 ---
+
+##**Analyse exploratoire de données**
+
 ```{r}
 install.packages("factoextra")
 ```
@@ -24,9 +27,10 @@ library(ROCR)
 library(dplyr)
 ```
 
+Lecture des données
 
 ```{r setup, include=FALSE}
-# Lecture des données
+
 # path="http://www.math.univ-toulouse.fr/~besse/Wikistat/data/"
 path <- ""
 df <- read.csv(paste(path, "global-data-on-sustainable-energy (1).csv", sep = ""),
@@ -38,27 +42,31 @@ summary(df)
 # Vérification de la dimension
 #view(df)
 ```
-
+# 1. Transformation des variables "Year" et "Density.P.Km2"
 
 ```{r}
 df[,"Year"] <- as.factor(df[,"Year"])
 df[,"Density.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.P.Km2."])))
 
 summary(df["Density.P.Km2."])
+#summary(df["Year"])
 #view(df)
 
 ```
 
+# 2. Taux de valeurs manquantes pour chaque variable
 
 ```{r}
 for (i in names(df))
   print(paste(sum(is.na(df[i])/nrow(df)*100) ,":", i))
 ```
+On retire les variables qui ont un taux de valeurs manquantes trop important
 
 ```{r}
 new_df <- subset(df, select = -c(Renewable.electricity.generating.capacity.per.capita, Financial.flows.to.developing.countries..US..., Renewables....equivalent.primary.energy.))
 nrow(new_df)
 ```
+# 3. Création d'un dataframe contenant les variables qui n'ont pas de valeurs manquantes
 
 ```{r}
 df2 <- na.omit(new_df)
@@ -69,13 +77,10 @@ nrow(df2)
 summary(df2)
 ```
 
-
+# 4. Analyse descriptive unidimentionnelle
 ```{r}
 library(ggplot2)
 library(gridExtra)
-
-
-#A compléter : faire des boxplots (si tu veux ^^)
 
 g1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
   geom_histogram(aes(y=after_stat(density)))+
@@ -101,10 +106,8 @@ grid.arrange(g5,g6,g7,g8,ncol=2)
 grid.arrange(g9, g10, g11, g12, g13, g14, ncol=2)
 rm(g1,g2,g3,g4,g5,g6,g7,g8)
 ```
-Transformations possibles : 
-- Quantitative en qualitative (Year)
--  Quantitative en Qualitative  (à l'aide d'un seuil)
-- Transformation de var quantitative : log(), sqrt(), 
+
+Transformations possibles : - Quantitative en qualitative (Year) - Quantitative en Qualitative (à l'aide d'un seuil) - Transformation de var quantitative : log(), sqrt(),
 
 ```{r}
 b1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
@@ -133,6 +136,9 @@ rm(b1,b2,b3,b4,b5,b6,b7,b8)
 
 ```
 
+
+Transformations adéquates des variables
+
 ```{r}
 #Le graphe précedent n'était pas explicite donc on utilise le log pour visualiser des var qui ont des ordres de grandeurs différents. A la fin, regarder si les transformations ont été pertinentes : comparer les résultats avec les deux df (df2 et df3).
 #On va vouloir ici réaliser des transformations de variables avec la fonction log. Cependant, log(0) renvoie -Inf, donc on doit adapter les données pour pouvoir les visualiser correctement. Vérifions déjà quelles données possèdent des 0.
@@ -142,7 +148,6 @@ sum(df$Electricity.from.renewables..TWh.==0, na.rm=TRUE)
 sum(df$Electricity.from.fossil.fuels..TWh.==0, na.rm=TRUE)
 summary(df$Electricity.from.nuclear..TWh.==0)
 ```
-
 
 ```{r}
 eps = 0.1 #On utilise eps pour décaler les valeurs, et ainsi éviter de faire log(0)=-Inf...
@@ -211,8 +216,6 @@ g8<-ggplot(df3,aes(x=Transformed_variable))+
 grid.arrange(g1, g8, ncol = 2)
 ```
 
-
-
 ```{r}
 df2 <- df2 %>% mutate(Transformed_variable = log(Density.P.Km2.))
 
@@ -264,12 +267,10 @@ g8<-ggplot(df3,aes(x=Transformed_variable))+
 grid.arrange(g1, g8, ncol = 2)
 ```
 
-
 ```{r}
 # On garde Value_CO2_log, car cette variable nous permet de mieux visualiser les émissions de tous les pays, mais pour les autres, pb de 0.
 df3 <- subset(df3, select = -c(Nuclear_log, Renewables_log, Fossil_fuels_log))
 ```
-
 
 ```{r}
 summary(df3)
@@ -285,7 +286,7 @@ summary(df2)
 
 
 ```
-
+# 5. Emissions de C02 par les différents pays
 
 ```{r, echo=FALSE}
 library(tidyverse)
@@ -293,24 +294,73 @@ library(tidyverse)
 pays_pollueurs<- df3 %>% arrange(desc(Value_co2_log)) %>% ## on classe par ordre décroissant
 select(Entity,Value_co2_log) ## on sélectionne les 2 colonnes
 
+## Les 5 pays les plus pollueurs
 pays_pollueurs <- distinct(pays_pollueurs,Entity)
 pays_pollueurs <- pays_pollueurs %>% slice(1:5)
 print(pays_pollueurs)
 ```
-# ANALYSE MULTI-DIMENTIONNELLE
 
-graphe de correlations
+# 6. Analyse multidimentionnelle
+
 ```{r}
 summary(df3)
 ```
 
+Nuage de points
+
 ```{r}
-ggplot(data.frame(x=df3$Electricity.from.nuclear..TWh., y=df3$Value_co2_log),aes(x,y))+
+ggplot(data.frame(x=df3$Electricity.from.renewables..TWh., y=df3$Value_co2_log),aes(x,y))+
 geom_point(col='blue')
 ```
+
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.renewables..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie renouvelables et émissions de CO2")
+ggplot(data.frame(x=df3$Electricity.from.nuclear..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie nucléaire et émissions de CO2")
+ggplot(data.frame(x=df3$Electricity.from.fossil.fuels..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie fossile et les émissions de CO2")
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.nuclear..TWh., y=df3$gdp_per_capita),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie nucléaire et le PIB par habitant")
+ggplot(data.frame(x=df3$Electricity.from.renewables..TWh., y=df3$gdp_per_capita),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergies renouvelables et le PIB par habitant")
+ggplot(data.frame(x=df3$Electricity.from.fossil.fuels..TWh., y=df3$gdp_per_capita),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergies non renouvelables et le PIB par habitant")
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Energy_consumption_log, y=df3$Access.to.electricity....of.population.),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre accés à l'electricité et la consommation d'énergie")
+ggplot(data.frame(x=df3$Energy_consumption_log, y=df3$Access.to.clean.fuels.for.cooking),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre accés au carburant propre pour la cuisine et la consommation d'énergie")
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.fossil.fuels..TWh., y=df3$Low.carbon.electricity....electricity.),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre prod énergies non renouvelables et à faible emission carbone  ")
+```
+
+```{r}
+ggplot(data.frame(x=df3$Value_co2_log, y=df3$Primary.energy.consumption.per.capita..kWh.person.),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre émission CO2 et conso d'énergies primaires ")
+```
+
+```{r}
+ggplot(data.frame(x=df3$Value_co2_log, y=df3$Renewable.energy.share.in.the.total.final.energy.consumption....),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre émission CO2 et conso d'énergies renouvelables  ")
+```
+
 ```{r}
 cor.test(df3$Electricity.from.nuclear..TWh., df3$Value_co2_log)
 ```
+
 ```{r}
 alpha = 0.05
 
@@ -325,18 +375,19 @@ for (i in 3:length(df3)){
 }
 ```
 
-
 ```{r}
 ggplot(data.frame(x=df3$Year, y=df3$Primary.energy.consumption.per.capita..kWh.person.),aes(x,y))+
 geom_point(col='blue')
 ```
 
+Graphe de corrélations
 
 ```{r}
 corrplot(cor(df3[, c(3:19)]), 
          method = "ellipse", 
          tl.cex = 0.4)
 ```
+
 ```{r}
 ggplot(data.frame(x=df3$Access.to.electricity....of.population., y=df3$Renewable.energy.share.in.the.total.final.energy.consumption....),aes(x,y))+
 ```
@@ -348,47 +399,59 @@ ggpairs(df3[, c(3:19)])
 ```{r}
 geom_point(col='blue')
 ```
-```{r}
-library(caret)
 
-# Normalisation avec preProcess
-preproc <- preProcess(df2[, c(3:19)], method = c("center", "scale"))
-df2_stand <- predict(preproc, df2[, c(3:19)])
+# 7. Analyse en composante principale
+
+```{r}
+
+# Normalisation des données
+df_norm <- scale(df2[, c(3:19)])
 
 ```
+
 
 ```{r}
 ## ACP
-library(FactoMineR)
-ACP_df2 <- PCA(df2_stand, scale.unit = TRUE,
-           graph = FALSE, ncp = 7)
-g1<-fviz_eig(ACP_df2, addlabels = TRUE, ylim = c(0, 40))
-grid.arrange(g1,ncol=1)
-     
+df_PCA <- PCA(df_norm)
+print(df_PCA)
 ```
+```{r}
+summary(df_PCA)  
+```
+
+
+Combien faut-il garder de composantes pour expliquer au mieux nos données ?
 
 ```{r}
-# Visualisation des individus sur les deux premières composantes principales
-g2 <- fviz_pca_ind(ACP_df2,
-                   axes = c(2, 3),
-                   col.ind = "cos2", # Color by the quality of representation
-                   gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-                   repel = TRUE, # Évite le chevauchement des étiquettes
-                   addEllipses = TRUE, # Ajoute des ellipses de confiance autour des groupes
-                   legend.title = "Cos2")
-
-grid.arrange(g2,ncol=1)
-
+df_PCA$eig
 ```
+
 ```{r}
 options(repr.plot.width = 9, repr.plot.height = 6)
 
-fviz_pca(ACP_df2, axes=c(1,2), geom = c("point"), col.ind="grey")
-
-     
+fviz_pca(df_PCA, axes=c(1,2), geom = c("point"), col.ind="grey")
+fviz_pca(df_PCA, axes=c(1,3), geom = c("point"), col.ind="grey")
+fviz_pca(df_PCA, axes=c(2,3), geom = c("point"), col.ind="grey")
 ```
+Qualité de représentation des variables : plus le résultat est proche de 1 mieux c'est
+
 ```{r}
-#print(ACP_df2)
-summary(ACP_df2)
+df_PCA$var$cos2
+```
+Contribution des variables aux axes : plus la valeur est grande plus la variable contribue à l'axe
+
+```{r}
+df_PCA$var$contrib
+```
+
+# 8. Dépendance entre "Year" et  "Value-co2-emissions"
+
+```{r}
+# violin plot
+ ggplot(data.frame(x=df2$Year, y=df2$Value_co2_log),aes(x,y)) + 
+  geom_violin()
+
+# diagramme en boite
+boxplot(df2$Value_co2_log~ df2$Year , data = df2)
 ```
 
