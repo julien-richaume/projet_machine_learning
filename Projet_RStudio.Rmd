@@ -428,3 +428,37 @@ df_PCA$var$contrib
 boxplot(df2$Value_co2_log~ df2$Year , data = df2)
 ```
 
+
+##**Modélisation**
+
+
+```{r}
+set.seed(579) # initialisation du générateur
+
+# Extraction des échantillons
+test.ratio <- .2   # part de l'échantillon test
+
+npop <- nrow(df2) # nombre de lignes dans les données
+nvar <- ncol(df2) # nombre de colonnes
+
+# taille de l'échantillon test
+ntest <- ceiling(npop * test.ratio) 
+
+# indices de l'échantillon test
+testi <- sample(1:npop, ntest)
+# indices de l'échantillon d'apprentissage
+appri <- setdiff(1:npop, testi)
+
+# construction de l'échantillon d'apprentissage
+datappr <- df2[appri, -11] 
+# construction de l'échantillon test
+datestr <- df2[testi, -11] 
+
+# vérification
+str(datappr)
+str(datestr)
+
+#summary(datappr) 
+#summary(datestr)
+```
+
