@@ -4,12 +4,6 @@ output: html_document
 date: "2024-02-16"
 ---
 
-##**Analyse exploratoire de données**
-
-```{r}
-install.packages("factoextra")
-```
-
 ```{r}
 library(ggplot2)
 library(tidyverse)
@@ -42,6 +36,9 @@ summary(df)
 # Vérification de la dimension
 #view(df)
 ```
+
+##**Analyse exploratoire de données**
+
 # 1. Transformation des variables "Year" et "Density.P.Km2"
 
 ```{r}
@@ -50,7 +47,7 @@ df[,"Density.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.P.Km2."])))
 
 summary(df["Density.P.Km2."])
 #summary(df["Year"])
-view(df)
+#view(df)
 ```
 
 # 2. Taux de valeurs manquantes pour chaque variable
@@ -156,8 +153,8 @@ df2 <- df2 %>% mutate(Nuclear_log = log(Electricity.from.nuclear..TWh. + eps),
                       Fossil_fuels_log = log(Electricity.from.fossil.fuels..TWh. + eps))
 
 df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country), #Aucun 0 pour cette variable, la transfo log est pertinente et utile.
-                      Primary_energy_consumption_log = log(Primary.energy.consumption.per.capita..kWh.person.),
-                      Renewable_energy_share_log = log(Renewable.energy.share.in.the.total.final.energy.consumption....),
+                      Primary_energy_consumption_log = log(Primary.energy.consumption.per.capita..kWh.person. +eps),
+                      Renewable_energy_share_log = log(Renewable.energy.share.in.the.total.final.energy.consumption....+eps),
                       .keep = "unused")
 
 # On garde Low.carbon.electricity, Access_to_electricity, Access_to_clean_fuels, gdp_growth comme telles.
@@ -378,7 +375,7 @@ geom_point(col='blue')
 
 ```{r}
 # Normalisation des données
-df_norm <- scale(df2[, c(3:19)])
+df_norm <- data.frame(scale(df3[, c(3:18)]))
 ```
 
 
@@ -421,28 +418,30 @@ df_PCA$var$contrib
 
 ```{r}
 # violin plot
- ggplot(data.frame(x=df2$Year, y=df2$Value_co2_log),aes(x,y)) + 
+ ggplot(data.frame(x=df3$Year, y=df3$Value_co2_log),aes(x,y)) + 
   geom_violin()
 
 # diagramme en boite
-boxplot(df2$Value_co2_log~ df2$Year , data = df2)
+boxplot(df2$Value_co2_log~ df2$Year , data = df3)
 ```
 
 
 ##**Modélisation**
 
-
+#1. Extraction des échantillons de données
 ```{r}
+df_norm <- data.frame(df_norm)
+
 set.seed(579) # initialisation du générateur
 
 # Extraction des échantillons
 test.ratio <- .2   # part de l'échantillon test
 
-npop <- nrow(df2) # nombre de lignes dans les données
-nvar <- ncol(df2) # nombre de colonnes
+npop <- nrow(df_norm) # nombre de lignes dans les données
+nvar <- ncol(df_norm) # nombre de colonnes
 
 # taille de l'échantillon test
-ntest <- ceiling(npop * test.ratio) 
+ntest <- ceiling(npop * test.ratio)
 
 # indices de l'échantillon test
 testi <- sample(1:npop, ntest)
@@ -450,9 +449,11 @@ testi <- sample(1:npop, ntest)
 appri <- setdiff(1:npop, testi)
 
 # construction de l'échantillon d'apprentissage
-datappr <- df2[appri, -11] 
+datappr <- df_norm[appri, -c(1,2,5)]
 # construction de l'échantillon test
-datestr <- df2[testi, -11] 
+datastr <- df_norm[testi, -c(1,2,5)]
+
+datappr_tot <- df3[appri, -c(1,5)]
 
 # vérification
 str(datappr)
@@ -460,5 +461,147 @@ str(datestr)
 
 #summary(datappr) 
 #summary(datestr)
+#enlever elect from fuels pour regression 
+## transformer entity en variable plus petite ex par continent
+```
+
+# 2. Modèle de régression linéaire Gaussien sans sélection de variables
+
+Algo pour visualiser le graphe des résidus
+```{r}
+gplot.res <- function(x, y, titre = "titre"){
+    ggplot(data.frame(x=x, y=y),aes(x,y))+
+    geom_point(col = "blue")+xlim(0, 20)+ylim(-10, 10)+
+    ylab("Résidus")+ xlab("Valeurs prédites")+
+    ggtitle(titre)+
+    geom_hline(yintercept = 0,col="green")
+}
+```
+
+# Sans pénalisation : 
+
+
+```{r}
+# estimation du modèle sans interaction
+reg.lm <- aov(Value_co2_log ~ . , data = datappr)
+
+# Extraction des résidus et des valeurs ajustées de ce modèle
+res.lm <- reg.lm$residuals
+fit.lm <- reg.lm$fitted.values
+
+# Graphe des résidus. 
+gplot.res(fit.lm,res.lm,"ANCOVA sans sélection de variables")
+```
+Significativité du modèle
+
+```{r}
+summary(reg.lm)
+```
+
+```{r}
+coef(reg.lm)
+```
+
+## Modèle de régression linéaire Gaussien avec sélection de variables
+
+# Avec pénalisation: par régularisation L1 (LASSO)
+
+```{r}
+library(glmnet)
+```
+
+```{r}
+df.mat <- model.matrix(Value_co2_log ~ . - 1, data = datappr) #on retire l'intercept du modèle 
+
+# avec des variables quantitatives seulement
+reg.lasso.quanti <- glmnet(y = datappr$Value_co2_log ,
+                           x = df.mat )
+
+options(repr.plot.width = 12, repr.plot.height = 10)
+plot(reg.lasso.quanti, xvar = "lambda", label = TRUE)
+#legend("topright", legend = paste(1:ncol(df.mat), " - ", colnames(df.mat)))
+
+print(df.mat)
+```
+```{r}
+gplot.res <- function(x, y, titre = "titre", xmin, xmax, ymin, ymax){
+    ggplot(data.frame(x=x, y=y),aes(x,y))+
+    geom_point(col = "blue")+xlim(xmin, xmax)+ylim(ymin, ymax)+
+    ylab("Résidus")+ xlab("Valeurs prédites")+
+    ggtitle(titre)+
+    geom_hline(yintercept = 0,col="green")
+}
+```
+
+
+# 2 .Performances de modèles : SVM
+
+
+```{r}
+library(e1071)
+#help(svm)
+```
+
+```{r}
+sum(is.na(datappr))
+```
+
+```{r}
+svm.reg0 = svm(Value_co2_log ~ ., data = datappr)
+summary(svm.reg0)
+```
+
+```{r}
+svm.reg.tune = tune.svm(Value_co2_log ~ ., data = datappr, cost = c(100, 500, 1000), 
+    gamma = seq(0.01, 0.03, by = 0.01))
+plot(svm.reg.tune)
+plot(svm.reg.tune$best.model)
+summary(svm.reg.tune$best.model)
+```
+```{r}
+#Modèle svm avec les meilleurs paremètres trouvés précédemment
+
+svm.reg = svm(Value_co2_log ~ ., data = datappr, cost = svm.reg.tune$best.parameters$cost, 
+    gamma = svm.reg.tune$best.parameters$gamma)
+summary(svm.reg)
+
+
+#graphe des résidus
+
+model = svm.reg
+fit.svmr=model$fitted
+res.svmr=fit.svmr-datappr[,"Value_co2_log"]
+gplot.res(fit.svmr,res.svmr,titre="", xmin=-3, xmax=3, ymin=-1.5, ymax=1.5)
+gplot.res(fit.svmr, fit.svmr-datastr[,"Value_co2_log"], xmin=-5, xmax=5, ymin=-5, ymax=5)
+
+model = svm.reg0
+fit.svmr=model$fitted
+res.svmr=fit.svmr-datappr[,"Value_co2_log"]
+gplot.res(fit.svmr,res.svmr,titre="", xmin=-3, xmax=3, ymin=-1.5, ymax=1.5)
+
+```
+
+
+```{r}
+library(rpart) 
+library(rpart.plot)
+#help(rpart)
+#help(rpart.control)
+```
+
+```{r}
+tree.reg=rpart(Value_co2_log~.,data=datappr,control=rpart.control(cp=0.001))
+options(repr.plot.width = 20, repr.plot.height = 15)
+rpart.plot(tree.reg)
+```
+
+```{r}
+xmat<-xpred.rpart(tree.reg,xval=10) 
+# one row for each observation and one column for each complexity value
+
+# Cross-validation error par valeur de CP
+CVerr<-apply((xmat-datastr[,"Value_co2_log"])^2,2,sum)
+
+plotcp(tree.reg)
 ```
 
