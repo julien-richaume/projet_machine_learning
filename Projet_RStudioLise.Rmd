@@ -55,6 +55,11 @@ summary(df["Density.P.Km2."])
 ```{r}
 for (i in names(df))
   print(paste(sum(is.na(df[i])/nrow(df)*100) ,":", i))
+
+library(naniar)
+gg_miss_var(df)
+
+library(VIM)
 ```
 On retire les variables qui ont un taux de valeurs manquantes trop important
 
@@ -999,18 +1004,35 @@ on garde seulement les variables quantitatives pour comparer les différentes m�
 dataframe contenant les données iniatiales quantitatives (contenant aussi les valeurs NA)
 
 ```{r}
-df_quanti <- df[,-c(1,2)]
-df_quanti
-
-ind.na=which(is.na(df_quanti),arr.ind=TRUE)
+Xnaquanti=df[,-c(1,2)]
+Xquanti=df2[,-c(1,2)]
+ind.na=which(is.na(Xnaquanti),arr.ind=TRUE)
 ```
 
-Complétion par la dernière valeur connue
+
+Imputation simple 
+
+
+Complétion par la moyenne
+
+```{r}
+moy<- colMeans(Xnaquanti, na.rm = TRUE)
+X_moy=Xnaquanti
+ind.na=which(is.na(X_moy),arr.ind=TRUE)
+X_moy[ind.na]=moy[ind.na[,2]]
+
+```
+
+
 ```{r}
 library(zoo) # chargement de la bibliothèque
-df_quanti.locf=na.locf(df_quanti,na.rm=FALSE)
-X.locf=na.locf(X.locf,na.rm=FALSE,fromLast=TRUE) # dans l'autre sens
-err.locf=(Xquanti-X.locf)[ind.na.Temp,2]
-boxplot(err.locf)
+df2.locf=na.locf(Xnaquanti,na.rm=FALSE)
+df2.locf=na.locf(df2.locf,na.rm=FALSE,fromLast=TRUE) # dans l'autre sens
+
+```
+
+```{r}
+library(naniar)
+gg_miss_var(df2.locf)
 ```
 
