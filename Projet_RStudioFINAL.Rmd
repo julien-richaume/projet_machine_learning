@@ -1,0 +1,1145 @@
+---
+title: "Projet"
+output: html_document
+date: "2024-02-16"
+---
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(GGally)
+library(plotly)
+library(corrplot)
+library(reshape2)
+library(FactoMineR)
+library(factoextra)
+library(glmnet) 
+library(ggfortify)
+library(pROC)
+library(ROCR)
+library(dplyr)
+```
+
+Lecture des données
+
+```{r setup, include=FALSE}
+
+# path="http://www.math.univ-toulouse.fr/~besse/Wikistat/data/"
+path <- ""
+df <- read.csv(paste(path, "global-data-on-sustainable-energy (1).csv", sep = ""),
+                    sep = ",", dec="." ,header = TRUE)
+# Premières lignes du jeu de données
+head(df)
+# Vérification du contenu
+summary(df)
+# Vérification de la dimension
+#view(df)
+```
+
+##**Analyse exploratoire de données**
+
+# 1. Transformation des variables "Year" et "Density.P.Km2"
+
+```{r}
+df[,"Year"] <- as.factor(df[,"Year"])
+df[,"Density.P.Km2."] <- as.numeric(gsub(",",".",(df[,"Density.P.Km2."])))
+
+summary(df["Density.P.Km2."])
+#summary(df["Year"])
+#view(df)
+```
+
+# 2. Taux de valeurs manquantes pour chaque variable
+
+```{r}
+for (i in names(df))
+  print(paste(sum(is.na(df[i])/nrow(df)*100) ,":", i))
+
+library(naniar)
+gg_miss_var(df)
+
+library(VIM)
+```
+On retire les variables qui ont un taux de valeurs manquantes trop important
+
+```{r}
+new_df <- subset(df, select = -c(Renewable.electricity.generating.capacity.per.capita, Financial.flows.to.developing.countries..US..., Renewables....equivalent.primary.energy.))
+nrow(new_df)
+```
+# 3. Création d'un dataframe contenant les variables qui n'ont pas de valeurs manquantes
+
+```{r}
+df2 <- na.omit(new_df)
+nrow(df2)
+```
+
+```{r}
+summary(df2)
+```
+
+# 4. Analyse descriptive unidimentionnelle
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+g1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue") 
+g2<-ggplot(df2,aes(x=Access.to.clean.fuels.for.cooking))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue") 
+g3<-ggplot(df2,aes(x=as.integer(Renewable.energy.share.in.the.total.final.energy.consumption....)))+geom_histogram(aes(y=after_stat(density)), binwidth=10)+geom_density(alpha=.2, col="blue") 
+g4<-ggplot(df2,aes(x=as.integer(Electricity.from.fossil.fuels..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g5<-ggplot(df2,aes(x=as.integer(Electricity.from.nuclear..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g6<-ggplot(df2,aes(x=as.integer(Electricity.from.renewables..TWh.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g7<-ggplot(df2,aes(x=as.integer(Low.carbon.electricity....electricity.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g8<-ggplot(df2,aes(x=as.integer(Primary.energy.consumption.per.capita..kWh.person.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g9<-ggplot(df2,aes(x=as.integer(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g10<-ggplot(df2,aes(x=as.integer(Value_co2_emissions_kt_by_country)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g11<-ggplot(df2,aes(x=as.integer(gdp_growth)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g12<-ggplot(df2,aes(x=as.integer(gdp_per_capita)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g13<-ggplot(df2,aes(x=as.integer(Density.P.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+g14<-ggplot(df2,aes(x=as.integer(Land.Area.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_density(alpha=.2, col="blue") 
+
+grid.arrange(g1,g2, g3,g4,ncol=2)
+grid.arrange(g5,g6,g7,g8,ncol=2)
+grid.arrange(g9, g10, g11, g12, g13, g14, ncol=2)
+rm(g1,g2,g3,g4,g5,g6,g7,g8)
+```
+
+Transformations possibles : - Quantitative en qualitative (Year) - Quantitative en Qualitative (à l'aide d'un seuil) - Transformation de var quantitative : log(), sqrt(),
+
+```{r}
+b1<-ggplot(df2,aes(x=Access.to.electricity....of.population.))+
+  geom_boxplot()
+b2<-ggplot(df2,aes(x=Access.to.clean.fuels.for.cooking))+
+  geom_boxplot()
+b3<-ggplot(df2,aes(x=as.integer(Renewable.energy.share.in.the.total.final.energy.consumption....)))+geom_boxplot()
+b4<-ggplot(df2,aes(x=as.integer(Electricity.from.fossil.fuels..TWh.)))+geom_boxplot()
+b5<-ggplot(df2,aes(x=as.integer(Electricity.from.nuclear..TWh.)))+geom_boxplot()
+b6<-ggplot(df2,aes(x=as.integer(Electricity.from.renewables..TWh.)))+geom_boxplot()
+b7<-ggplot(df2,aes(x=as.integer(Low.carbon.electricity....electricity.)))+geom_boxplot()
+b8<-ggplot(df2,aes(x=as.integer(Primary.energy.consumption.per.capita..kWh.person.)))+geom_boxplot()
+b9<-ggplot(df2,aes(x=as.integer(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.)))+geom_boxplot()
+b10<-ggplot(df2,aes(x=as.integer(Value_co2_emissions_kt_by_country)))+geom_boxplot()
+b11<-ggplot(df2,aes(x=as.integer(gdp_growth)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+b12<-ggplot(df2,aes(x=as.integer(gdp_per_capita)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+b13<-ggplot(df2,aes(x=as.integer(Density.P.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+b14<-ggplot(df2,aes(x=as.integer(Land.Area.Km2.)))+geom_histogram(aes(y=after_stat(density)))+geom_boxplot()
+  
+grid.arrange(b1,b2, b3,b4,ncol=2)
+grid.arrange(b5,b6,b7,b8,ncol=2)
+grid.arrange(b9, b10, b11, b12, b13, b14, ncol=2)
+rm(b1,b2,b3,b4,b5,b6,b7,b8)
+
+
+
+```
+
+
+Transformations adéquates des variables
+
+```{r}
+#Le graphe précedent n'était pas explicite donc on utilise le log pour visualiser des var qui ont des ordres de grandeurs différents. A la fin, regarder si les transformations ont été pertinentes : comparer les résultats avec les deux df (df2 et df3).
+#On va vouloir ici réaliser des transformations de variables avec la fonction log. Cependant, log(0) renvoie -Inf, donc on doit adapter les données pour pouvoir les visualiser correctement. Vérifions déjà quelles données possèdent des 0.
+sum(df$Value_co2_emissions_kt_by_country==0, na.rm=TRUE)
+sum(df$Electricity.from.nuclear..TWh.==0, na.rm=TRUE)  #3000 variables nulles pour le nucléaire, cette variable ne peut pas être transformée avec log
+sum(df$Electricity.from.renewables..TWh.==0, na.rm=TRUE)
+sum(df$Electricity.from.fossil.fuels..TWh.==0, na.rm=TRUE)
+summary(df$Electricity.from.nuclear..TWh.==0)
+```
+
+```{r}
+eps = 0.1 #On utilise eps pour décaler les valeurs, et ainsi éviter de faire log(0)=-Inf...
+
+df2 <- df2 %>% mutate(Nuclear_log = log(Electricity.from.nuclear..TWh. + eps),
+                      Renewables_log = log(Electricity.from.renewables..TWh. + eps),
+                      Fossil_fuels_log = log(Electricity.from.fossil.fuels..TWh. + eps))
+
+df2 <- df2 %>% mutate(Value_co2_log = log(Value_co2_emissions_kt_by_country), #Aucun 0 pour cette variable, la transfo log est pertinente et utile.
+                      Primary_energy_consumption_log = log(Primary.energy.consumption.per.capita..kWh.person. +eps),
+                      Renewable_energy_share_log = log(Renewable.energy.share.in.the.total.final.energy.consumption....+eps),
+                      .keep = "unused")
+
+# On garde Low.carbon.electricity, Access_to_electricity, Access_to_clean_fuels, gdp_growth comme telles.
+  
+df3 <- df2
+
+g2<-ggplot(df3,aes(x=Value_co2_log))+
+  geom_histogram(aes(y=after_stat(density)), binwidth=1)+
+  geom_density(alpha=.2, col="blue")
+
+g4<-ggplot(df3,aes(x=Fossil_fuels_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g5<-ggplot(df3,aes(x=Nuclear_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g6<-ggplot(df3,aes(x=Renewables_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g7<-ggplot(df3,aes(x=Primary_energy_consumption_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Renewable_energy_share_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g2,g4,g5,g6,g7,g8,ncol=2)
+
+df3$Year <- as.factor(df3$Year)
+
+df3 <- subset(df3, select = -c(Nuclear_log, Renewables_log, Fossil_fuels_log)) #pb de valeurs nulles, ne fonctionne pas bien avec la transfo log !
+```
+
+```{r}
+grid.arrange(g2,g4,g5,g6,ncol=2)
+```
+
+```{r}
+df3 <- df3 %>% mutate(Energy_intensity_level_log = log(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.))
+
+g1<-ggplot(df3,aes(x=Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.))+
+  geom_histogram(aes(y=after_stat(density)), binwidth=1)+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Energy_intensity_level_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+
+df3 <- subset(df3, select = -c(Energy.intensity.level.of.primary.energy..MJ..2017.PPP.GDP.))
+```
+
+```{r}
+df3 <- df3 %>% mutate(Density_log = log(Density.P.Km2.))
+
+g1<-ggplot(df3,aes(x=Density.P.Km2.))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Density_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+
+df3 <- subset(df3, select = -c(Density.P.Km2.))
+```
+
+```{r}
+df3 <- df3 %>% mutate(Land_Area_log = log(Land.Area.Km2.))
+
+g1<-ggplot(df3,aes(x=Land.Area.Km2.))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=Land_Area_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+
+df3 <- subset(df3, select = -c(Land.Area.Km2.))
+```
+
+
+```{r}
+df3 <- df3 %>% mutate(gdp_per_capita_log = log(gdp_per_capita))
+
+g1<-ggplot(df3,aes(x=gdp_per_capita))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+g8<-ggplot(df3,aes(x=gdp_per_capita_log))+
+  geom_histogram(aes(y=after_stat(density)))+
+  geom_density(alpha=.2, col="blue")
+
+grid.arrange(g1, g8, ncol = 2)
+
+df3 <- subset(df3, select = -c(gdp_per_capita))
+```
+
+
+```{r}
+summary(df3)
+```
+
+# 5. Emissions de C02 par les différents pays
+
+```{r, echo=FALSE}
+library(tidyverse)
+
+pays_pollueurs<- df3 %>% arrange(desc(Value_co2_log)) %>% ## on classe par ordre décroissant
+select(Entity,Value_co2_log) ## on sélectionne les 2 colonnes
+
+## Les 5 pays les plus pollueurs
+pays_pollueurs <- distinct(pays_pollueurs,Entity)
+pays_pollueurs <- pays_pollueurs %>% slice(1:5)
+print(pays_pollueurs)
+```
+
+# 6. Analyse multidimentionnelle
+
+```{r}
+summary(df3)
+```
+
+Nuage de points
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.renewables..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.renewables..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie renouvelables et émissions de CO2")
+ggplot(data.frame(x=df3$Electricity.from.nuclear..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie nucléaire et émissions de CO2")
+ggplot(data.frame(x=df3$Electricity.from.fossil.fuels..TWh., y=df3$Value_co2_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie fossile et les émissions de CO2")
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.nuclear..TWh., y=df3$gdp_per_capita),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergie nucléaire et le PIB par habitant")
+ggplot(data.frame(x=df3$Electricity.from.renewables..TWh., y=df3$gdp_per_capita),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergies renouvelables et le PIB par habitant")
+ggplot(data.frame(x=df3$Electricity.from.fossil.fuels..TWh., y=df3$gdp_per_capita),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre utilisation d'énergies non renouvelables et le PIB par habitant")
+```
+
+```{r}
+summary(df3)
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Primary_energy_consumption_log, y=df3$Access.to.electricity....of.population.),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre l'accès à l'electricité et la consommation d'énergie")
+ggplot(data.frame(x=df3$Primary_energy_consumption_log, y=df3$Access.to.clean.fuels.for.cooking),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre l'accès au carburant propre pour la cuisine et la consommation d'énergie")
+```
+
+
+```{r}
+ggplot(data.frame(x=df3$Electricity.from.fossil.fuels..TWh., y=df3$Low.carbon.electricity....electricity.),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre prod énergies non renouvelables et à faible emission carbone  ")
+```
+
+```{r}
+ggplot(data.frame(x=df3$Value_co2_log, y=df3$Primary_energy_consumption_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre émission CO2 et conso d'énergies primaires ")
+```
+
+```{r}
+ggplot(data.frame(x=df3$Value_co2_log, y=df3$Renewable_energy_share_log),aes(x,y))+
+geom_point(col='blue')+ggtitle("Relation entre émission CO2 et conso d'énergies renouvelables  ")
+```
+
+
+```{r}
+cor.test(df3$Electricity.from.nuclear..TWh., df3$Value_co2_log)
+```
+
+```{r}
+ggplot(data.frame(x=df3$Year, y=df3$Primary_energy_consumption_log),aes(x,y))+
+geom_point(col='blue')
+```
+
+Graphe de corrélations
+
+```{r}
+corrplot(cor(df3[, c(3:19)]), 
+         method = "ellipse", 
+         tl.cex = 0.4)
+```
+
+```{r}
+ggplot(data.frame(x=df3$Access.to.electricity....of.population., y=df3$Renewable_energy_share_log),aes(x,y))+
+```
+
+```{r}
+ggpairs(df3[, c(3:19)])
+```
+
+```{r}
+geom_point(col='blue')
+```
+
+# 7. Analyse en composante principale
+
+```{r}
+# Normalisation des données
+df_norm <- data.frame(scale(df3[, c(3:18)]))
+```
+
+
+```{r}
+## ACP
+df_PCA <- PCA(df_norm)
+print(df_PCA)
+```
+
+```{r}
+summary(df_PCA)  
+```
+
+
+Combien faut-il garder de composantes pour expliquer au mieux nos données ?
+
+```{r}
+df_PCA$eig
+```
+
+```{r}
+options(repr.plot.width = 9, repr.plot.height = 6)
+
+fviz_pca(df_PCA, axes=c(1,2), geom = c("point"), col.ind="grey")
+fviz_pca(df_PCA, axes=c(1,3), geom = c("point"), col.ind="grey")
+fviz_pca(df_PCA, axes=c(2,3), geom = c("point"), col.ind="grey")
+```
+Qualité de représentation des variables : plus le résultat est proche de 1 mieux c'est
+
+```{r}
+df_PCA$var$cos2
+```
+Contribution des variables aux axes : plus la valeur est grande plus la variable contribue à l'axe
+
+```{r}
+df_PCA$var$contrib
+```
+
+# 8. Dépendance entre "Year" et  "Value-co2-emissions"
+
+```{r}
+# violin plot
+ ggplot(data.frame(x=df3$Year, y=df3$Value_co2_log),aes(x,y)) + 
+  geom_violin()
+
+# diagramme en boite
+boxplot(df2$Value_co2_log~ df2$Year , data = df3)
+```
+
+
+##**Modélisation**
+
+#1. Extraction des échantillons de données
+```{r}
+df_norm <- data.frame(df_norm)
+
+set.seed(579) # initialisation du générateur
+
+# Extraction des échantillons
+test.ratio <- .2   # part de l'échantillon test
+
+npop <- nrow(df_norm) # nombre de lignes dans les données
+nvar <- ncol(df_norm) # nombre de colonnes
+
+# taille de l'échantillon test
+ntest <- ceiling(npop * test.ratio)
+
+# indices de l'échantillon test
+testi <- sample(1:npop, ntest)
+# indices de l'échantillon d'apprentissage
+appri <- setdiff(1:npop, testi)
+
+# construction de l'échantillon d'apprentissage
+datappr <- df_norm[appri, -c(1,2,5)]
+# construction de l'échantillon test
+datastr <- df_norm[testi, -c(1,2,5)]
+
+datappr_tot <- df3[appri, -c(1,5)]
+
+# vérification
+str(datappr)
+str(datastr)
+
+#summary(datappr) 
+#summary(datestr)
+#enlever elect from fuels pour regression 
+## transformer entity en variable plus petite ex par continent
+```
+
+# 2. Modèle de régression linéaire Gaussien 
+
+Algo pour visualiser le graphe des résidus
+
+```{r}
+gplot.res <- function(x, y, titre = "titre"){
+    ggplot(data.frame(x=x, y=y),aes(x,y))+
+    geom_point(col = "blue")+
+    ylab("Résidus")+ xlab("Valeurs prédites")+
+    ggtitle(titre)+
+    geom_hline(yintercept = 0,col="green")
+}
+```
+
+# Sans sélection de variables et sans pénalisation : 
+
+
+```{r}
+# estimation du modèle sans interaction
+reg.lm <- aov(Value_co2_log ~ . , data = datappr)
+
+# Extraction des résidus et des valeurs ajustées de ce modèle
+res.lm <- reg.lm$residuals
+fit.lm <- reg.lm$fitted.values
+
+# Graphe des résidus. 
+gplot.res(fit.lm,res.lm,"ANCOVA sans sélection de variables")
+```
+Significativité du modèle
+
+```{r}
+summary(reg.lm)
+```
+
+```{r}
+coef(reg.lm)
+```
+
+## Modèle de régression linéaire Gaussien sans sélection de variables mais avec pénalisation
+
+# Avec pénalisation: par régularisation L1 (LASSO)
+
+```{r}
+library(glmnet)
+```
+
+```{r}
+df.mat <- model.matrix(Value_co2_log ~ . - 1, data = datappr) #on retire l'intercept du modèle 
+
+# avec des variables quantitatives seulement
+reg.lasso.quanti <- glmnet(y = datappr$Value_co2_log ,
+                           x = df.mat )
+
+options(repr.plot.width = 12, repr.plot.height = 10)
+plot(reg.lasso.quanti, xvar = "lambda", label = TRUE)
+#legend("topright", legend = paste(1:ncol(df.mat), " - ", colnames(df.mat)))
+
+print(df.mat)
+```
+```{r}
+reg.lasso.cv <- cv.glmnet(y = datappr$Value_co2_log, x = df.mat)
+reg.lasso.cv$cvm[c(reg.lasso.cv$index)]
+```
+
+# Choix du paramètre de régularisation par validation croisée
+```{r}
+
+plot(reg.lasso.cv, ylim=c(0,0.2))
+abline(h=reg.lasso.cv$cvm[c(reg.lasso.cv$index)[2]-1], col='red');
+abline(h=reg.lasso.cv$cvm[c(reg.lasso.cv$index)[2]], col='blue');
+#autoplot(reg.lasso.cv)
+```
+```{r}
+# valeur estimée
+paste("CV estimate of lambda :", round(reg.lasso.cv$lambda.1se, 5))
+# modèle correspondant
+coef(reg.lasso.cv, s = "lambda.1se")
+
+plot(reg.lasso.quanti, xvar = "lambda", label = TRUE)
+abline(v=log(reg.lasso.cv$lambda.1se),col="red")
+```
+
+# pareil avec l'autre valeur de lambda "reg.lasso.cv$lambda.min"
+```{r}
+# valeur estimée
+paste("CV estimate of lambda :", round(reg.lasso.cv$lambda.min, 3))
+# modèle correspondant
+coef(reg.lasso.cv, s = "lambda.min")
+
+plot(reg.lasso.quanti, xvar = "lambda", label = TRUE)
+abline(v=log(reg.lasso.cv$lambda.min),col="red")
+```
+
+
+# Résidus en fonction des valeurs prédites
+```{r}
+# Extraction des valeurs ajustées et des résidus
+
+fit.lasso <- predict(reg.lasso.cv, s = "lambda.min", newx = df.mat)
+res.lasso <- datappr$Value_co2_log - fit.lasso
+
+fit.lasso.1se <- predict(reg.lasso.cv, s = "lambda.1se", newx = df.mat)
+res.lasso.1se <- datappr$Value_co2_log - fit.lasso.1se 
+
+# Graphe des résidus
+options(repr.plot.width = 12, repr.plot.height = 4)
+par(mfrow = c(1, 4))
+gplot.res(fit.lm, res.lm, "Linéaire, sans sélection")
+gplot.res(fit.lasso, res.lasso, "Linéaire, pénalité L1, lambda min")
+gplot.res(fit.lasso.1se, res.lasso.1se, "Linéaire, pénalité L1, lambda 1se") 
+```
+
+Calcul du critère MSE 
+```{r}
+paste("Modèle linéaire sans sélection:",mean(res.lm^2))
+paste("LASSO avec lambda.min:",mean(res.lasso^2))
+paste("LASSO avec lambda.1se:",mean(res.lasso.1se^2))
+```
+
+Erreur du modèle sans sélection par validation croisée
+
+```{r}
+V=10 ; nV=floor(nrow(datappr)/V)
+S=sample(1:nrow(datappr),replace=FALSE)
+error.CV = c()
+for(v in 1:V)
+{ # Rq : les deux dernières obs sont tjs dans l'échantillon d'apprentissage...
+    datappr.learn=datappr[-c(S[(nV*(v-1)):(nV*v)]),] 
+    datappr.valid=datappr[c(S[(nV*(v-1)):(nV*v)]),]
+    error.CV=c(error.CV,mean((datappr.valid$Value_co2_log-predict(aov(Value_co2_log ~ ., data=datappr.learn),newdata=datappr.valid))^2))
+}
+paste("Modèle linéaire sans sélection : ",mean(error.CV), "sur", length(error.CV),"subsets.")
+
+print(reg.lasso.cv)
+```
+
+# Modèle de régression quadratique 
+
+```{r}
+# Estimation du modèle avec toutes les interactions d'ordre 2
+reg.glm <- glm(Value_co2_log~ .^2, data = datappr)
+summary(reg.glm)
+```
+
+# Recherche du meilleur modèle par méthode descendante
+```{r}
+reg.glm.step <- step(reg.glm, direction = "backward", trace=0)
+summary(reg.glm.step)
+```
+
+```{r}
+reg.glm.step.BIC <- step(reg.glm, direction = "backward", k=log(nrow(datappr)),trace=0)
+summary(reg.glm.step.BIC)
+```
+
+
+Sélection de variable par régularisation LASSO
+
+```{r}
+# Comparer avec un modèle quadratique avec pénalité L1
+df.mat2 <- model.matrix(Value_co2_log ~ .^2 - 1, data = datappr)
+reg.lasso2.cv <- cv.glmnet(y = datappr$Value_co2_log, x = df.mat2)
+coef(reg.lasso2.cv, s = "lambda.1se")
+```
+
+```{r}
+# Extraction des valeurs ajustées et des résidus
+fit.glm <- reg.glm.step$fitted.values
+res.glm <- reg.glm.step$residuals
+fit.glm.BIC <- reg.glm.step.BIC$fitted.values
+res.glm.BIC <- reg.glm.step.BIC$residuals
+fit.lasso2 <- predict(reg.lasso2.cv, s = "lambda.min", newx = df.mat2)
+res.lasso2 <- datappr$Value_co2_log - fit.lasso2
+
+# Graphe des résidus
+#g1<-gplot.res(fit.lm, res.lm, "linéaire")
+#g2<-gplot.res(fit.lasso, res.lasso, "linéaire, pénalité L1")
+#g3<-gplot.res(fit.glm, res.glm, "quadratique, backward AIC")
+#g4<-gplot.res(fit.lasso2, res.lasso2, "quadratique, pénalité L1")
+#grid.arrange(g1,g2,g3,g4,ncol=2,nrow=2)
+
+options(repr.plot.width = 12, repr.plot.height = 4)
+par(mfrow = c(1, 4))
+gplot.res(fit.lm, res.lm, "Linéaire, sans sélection")
+gplot.res(fit.lasso, res.lasso, "linéaire, pénalité L1")
+gplot.res(fit.glm, res.glm, "quadratique, backward AIC")
+gplot.res(fit.glm.BIC, res.glm.BIC, "quadratique, backward BIC")
+gplot.res(fit.lasso2, res.lasso2, "quadratique, pénalité L1") 
+```
+
+Erreur de régression
+```{r}
+# Calcul des prévisions pour le modèle quadratique backward AIC
+pred.glm <- predict(reg.glm.step, newdata = datastr)
+# Erreur quadratique moyenne de prévision (MSE)
+sum((pred.glm - datastr$Value_co2_log)^2) / nrow(datestr)
+```
+
+Erreur de classification
+
+```{r}
+# Matrice de confusion pour la prévision du dépassement de seuil
+table(pred.glm > 0.5, datastr$Value_co2_log > 0.5)
+```
+
+
+# 2 .Performances de modèles : SVM
+
+
+```{r}
+library(e1071)
+#help(svm)
+```
+
+```{r}
+sum(is.na(datappr))
+```
+
+```{r}
+svm.reg0 = svm(Value_co2_log ~ ., data = datappr)
+summary(svm.reg0)
+```
+
+```{r}
+svm.reg.tune = tune.svm(Value_co2_log ~ ., data = datappr, cost = c(100, 500, 1000), 
+    gamma = seq(0.01, 0.03, by = 0.01))
+plot(svm.reg.tune)
+plot(svm.reg.tune$best.model)
+summary(svm.reg.tune$best.model)
+```
+```{r}
+#Modèle svm avec les meilleurs paremètres trouvés précédemment
+
+svm.reg = svm(Value_co2_log ~ ., data = datappr, cost = svm.reg.tune$best.parameters$cost, 
+    gamma = svm.reg.tune$best.parameters$gamma)
+summary(svm.reg)
+
+
+#graphe des résidus
+
+model = svm.reg
+fit.svmr=model$fitted
+res.svmr=fit.svmr-datappr[,"Value_co2_log"]
+gplot.res(fit.svmr,res.svmr,titre="", xmin=-3, xmax=3, ymin=-1.5, ymax=1.5)
+gplot.res(fit.svmr, fit.svmr-datastr[,"Value_co2_log"], xmin=-5, xmax=5, ymin=-5, ymax=5)
+
+model = svm.reg0
+fit.svmr=model$fitted
+res.svmr=fit.svmr-datappr[,"Value_co2_log"]
+gplot.res(fit.svmr,res.svmr,titre="", xmin=-3, xmax=3, ymin=-1.5, ymax=1.5)
+
+```
+
+
+```{r}
+library(rpart) 
+library(rpart.plot)
+#help(rpart)
+#help(rpart.control)
+```
+
+```{r}
+tree.reg=rpart(Value_co2_log~.,data=datappr,control=rpart.control(cp=0.001))
+options(repr.plot.width = 20, repr.plot.height = 15)
+rpart.plot(tree.reg)
+```
+
+```{r}
+xmat<-xpred.rpart(tree.reg,xval=10) 
+# one row for each observation and one column for each complexity value
+
+# Cross-validation error par valeur de CP
+CVerr<-apply((xmat-datastr[,"Value_co2_log"])^2,2,sum)
+
+plotcp(tree.reg)
+```
+
+# 3. Modèle de l'arbre optimal
+
+```{r}
+library(rpart)
+library(rpart.plot)
+```
+
+Arbre de régression
+```{r}
+tree.reg=rpart(Value_co2_log~.,data=datappr,control=rpart.control(cp=0.001))
+#Affichage du graphe de l'arbre
+options(repr.plot.width = 20, repr.plot.height = 15)
+rpart.plot(tree.reg)
+```
+
+Réduction des branches de l'arbre, élagage
+
+```{r}
+xmat<-xpred.rpart(tree.reg,xval=10) 
+
+# Cross-validation error par valeur de CP
+CVerr<-apply((xmat-datappr$Value_co2_log)^2,2,sum)
+
+plotcp(tree.reg)
+```
+
+On veut la valeur du cp qui correspond à la plus petite erreur.
+
+```{r}
+as.numeric(attributes(which.min(CVerr))$names)
+tree.reg=rpart(Value_co2_log~.,data=datappr,control=rpart.control(cp=as.numeric(attributes(which.min(CVerr))$names)))
+rpart.plot(tree.reg,type=2,extra="auto")
+```
+
+```{r}
+library(partykit)
+```
+
+Autre affichage bof
+```{r}
+plot(as.party(tree.reg), type="simple",cex=0.1)
+```
+
+Graphe des résidus
+```{r}
+fit.tree=predict(tree.reg)
+res.tree=fit.tree-datappr$Value_co2_log
+gplot.res(fit.tree,res.tree,"residus de tree.reg")
+
+#Forme particulière car la prédiction est constante par morceaux donc on affiche les résidus de la fonction en fonction des valeurs possibles.
+```
+
+```{r}
+library(caret)
+ctrl <- trainControl(method = "cv",number = 10)
+treecaret <- train(Value_co2_log~.,data=datappr,method = "rpart",trControl = ctrl,tuneLength =20)
+print(paste("Valeur de cp retenue = ",treecaret$bestTune,sep=""))
+rpart.plot(treecaret$finalModel)
+```
+
+#Prévision de l'échantillonage test
+
+Erreur de régression
+```{r}
+# Calcul des prévisions
+pred.treer=predict(tree.reg,newdata=datastr)
+# Erreur quadratique moyenne de prévision en régression
+sum((pred.treer-datastr$Value_co2_log)^2)/nrow(datestr)
+```
+
+Erreur de classification pour la régression
+```{r}
+#Matrice de confusion pour l'arbre de régression
+confusionMatrix(as.factor(pred.treer>0.5),as.factor(datastr$Value_co2_log>0.5))$table
+```
+
+
+Courbe ROC
+```{r}
+ROCregtree=pred.treer/300
+predregtree=prediction(ROCregtree,datestq$DepSeuil)
+perfregtree=performance(predregtree,"tpr","fpr")
+
+options(repr.plot.width = 8, repr.plot.height = 6)
+plot(perflogit,col="blue")
+plot(perfregtree,col="orange",lty=2,add=TRUE) 
+
+
+legend("right", legend=c("Logit", "TreeReg"),
+       col=c("blue","orange","green"), lty=c(1,2,1), text.font=1,    cex=0.8)
+
+```
+
+Modèle d'agrégation de modèle (Random Forest, Boosting)
+# Forets Aléatoires 
+
+L'algorithme random forest est un algorithme d'apprentissage. Il contruit un grand nombre d'arbres de décision où chaque arbre est formé à l'aide d'un échantillon bootstrap des données et en sélectionnant un sous-ensemble aléatoire de variables à chaque nœud de décision. Les prédictions finales sont obtenues en agrégeant les prédictions de tous les arbres, généralement par une moyenne pour les problèmes de régression
+ 
+```{r}
+library(randomForest)
+```
+
+Dans la commande suivante nous allons créer une foret aléatoire pour tenter d'expliquer la variable 'Value_co2_log'. Les données d'entrainement sur lesquels le modèle va s'appuyer sont 'datappr'.
+Le paramètre 'ntre' spécifie le nombre d'arbres à inclure dans la foret aléatoire.
+Le paramètre 'mtry'donne le nombre de variables à sélectionner à chaque fractionnement de l'arbre (par défaut il est ici égal à floor(ncol(datappr)/3)=4 )
+Le paramètre 'do.trace' signifie que l'on peut suivre les performances du processus jusqu'à ce que 50 arbres maximum soient construits.
+
+
+```{r}
+rf.reg=randomForest(Value_co2_log~., data=datappr, ntree=1000,do.trace=50,importance=TRUE, mtry=3)
+```
+
+```{r}
+#2ème arbre qui prend en compte les données test
+rf.reg2 = randomForest(x=datappr, y=datappr$Value_co2_log, xtest=datappr, ytest=datappr$Value_co2_log, ntree=1000,do.trace=50,importance=TRUE, mtry=3)
+```
+
+On cherche à minimiser le critère Out-Of-Bag pour trouver le nombre d'arbre adéquat.
+Dans le cas 2, les MSE sont bien plus petites.
+
+Nous allons afficher l'importance de chaque variable dans la prédiction du résultat:
+
+```{r}
+#attributes(rf.reg)
+rf.reg$importance
+print('-----Classement des variables selon leur importance------')
+sort(round(importance(rf.reg), 2)[,1], decreasing=TRUE)
+varImpPlot(rf.reg)
+```
+
+Les variables les plus influentes dans la prédiction de ce modèle sont 'Electricity.from.fossil.fuels..TWh.' et 'Land_Area'
+
+
+
+Validation croisée à l'aide de la fonction 'rfcv' dans le package random forest
+```{r}
+reg.rfr.cv=rfcv(datappr, datappr$Value_co2_log, nfold=10)
+print(reg.rfr.cv)
+```
+
+```{r}
+fit.rfr=rf.reg$predicted
+fit.rfr.cv=reg.rfr.cv$predicted$'13'
+fit.rfr2=rf.reg2$predicted
+res.rfr=fit.rfr-datappr$Value_co2_log
+res.rfr.cv=fit.rfr.cv-datappr$Value_co2_log
+res.rfr2=fit.rfr2-datappr$Value_co2_log
+gplot.res(fit.rfr,res.rfr,titre="")
+##avec le modèle optimal par validation croisée
+gplot.res(fit.rfr.cv,res.rfr.cv,titre="")
+gplot.res(fit.rfr2,res.rfr2,titre="")
+```
+
+
+
+Prévision de l'échantillon test 
+```{r}
+
+pred.rfr2 = rf.reg2$test$predicted
+sum((pred.rfr2-datastr$Value_co2_log)^2)/nrow(datastr)
+
+```
+
+
+# 4.Modèle par Boosting
+
+
+```{r}
+install.packages('gbm')
+library(gbm)
+```
+
+```{r}
+boost.reg = gbm(Value_co2_log ~ ., data = datappr, distribution = "gaussian", n.trees = 1000, 
+    cv.folds = 10, n.minobsinnode = 5, shrinkage = 0.01, verbose = FALSE)
+```
+
+
+```{r}
+# nombre optimal d'itérations par valiation croisée
+best.iter=gbm.perf(boost.reg,method="cv")
+```
+
+Test de la fonction boost en faisant varier le coef de rétrecissement
+```{r}
+test=numeric()
+for (i in 10:500){
+pred.test=predict(boost.reg,newdata=datestr,n.trees=i)
+err=sum((pred.test-datastr)^2)/nrow(datestr)
+test=c(test,err)}
+plot(10:500,test,type="l")
+abline(v=best.iter)
+```
+
+Prévision de l'échantillon test
+
+```{r}
+pred.boostr=predict(boost.reg,newdata=datestr,n.trees=best.iter)
+```
+
+#5. Modèle Réseau de neurones
+
++ nnet fit a single hidden layer neural network
+La librairie 'nnet' permet de créer des modèle de réseaux de neurone pour la régression. 
+Ici, on crée un modèle où la cible à prédire est 'Value_co2_log' et où les variables explicatives seront 'datappr'.
+
+Le paramètre 'size' spécifie le nimbre de neurones dans la couche cachée du réseau.
+Le paramètre 'decay' permet de controler le taux de régularisation appliqué aux poids du modèle pour éviter le surajustement.
+Le paramètre 'maxit' spécifie le nombre maximum d'itérations d'entraînement à effectuer.
+Le paramètre 'linout = TRUE' indique que la sortie du réseau de neurones sera linéaire.
+
+```{r}
+library(nnet)
+#Création du réseau de neurones
+nnet.reg=nnet(Value_co2_log ~ .,data=datappr,size=5,decay=1, linout=TRUE, maxit=500)
+summary(nnet.reg)
+```
+
+
+Optimisation des paramètres par validation croisée
+
+On recherche ici à ajuster les hyper-paramètres. On va chercher la meilleure combinaison de taille de la couche cachée ('size') et de taux de régularisation ('decay')
+```{r}
+library(e1071)
+plot(tune.nnet(Value_co2_log ~.,data=datappr,size=c(2,3,4), decay=c(1,2,3), maxit=500,linout=TRUE))
+plot(tune.nnet(Value_co2_log ~.,data=datappr,size=4:5,decay=1:10))
+```
+Quelle combinaison de paramètres donne la meilleure performance ? 
+
+Modèle optimal 
+
+```{r}
+#on genere le réseau de neurones résultant de notre choix de paramètres précédent
+nnet.reg=nnet(Value_co2_log~.,data=datappr,size=4,decay=10,linout=TRUE,maxit=200)
+
+# calcul et graphe des résidus
+fit.nnetr=predict(nnet.reg,data=datappr)
+res.nnetr=fit.nnetr-datappr$Value_co2_log
+gplot.res(fit.nnetr,res.nnetr,titre="")
+```
+
+Prévision de l'échantillon test
+
+```{r}
+pred.nnetr=predict(nnet.reg,newdata=datastr)
+
+```
+
+
+
+### Gestion des données manquantes ###
+on garde seulement les variables quantitatives pour comparer les différentes méthodes de complétion 
+
+dataframe contenant les données iniatiales quantitatives (contenant aussi les valeurs NA)
+
+```{r}
+Xnaquanti=df[,-c(1,2)] #avec valeurs NA
+Xquanti=df2[,-c(1,2)] #sans valeur NA
+ind.na=which(is.na(Xnaquanti),arr.ind=TRUE)
+ind.na.CO2 = which(is.na(Xnaquanti$Value_co2_emissions_kt_by_country),arr.ind=TRUE)
+```
+
+Visualisation de la proportion de valeur manquante dans notre dataframe df 
+```{r}
+library(naniar)
+gg_miss_var(Xnaquanti)
+```
+
+
+
+Imputation simple 
+
+
+Complétion par la moyenne
+
+```{r}
+moy<- colMeans(Xnaquanti, na.rm = TRUE) #on calcule la moyenne de chaque colonne du dataframe
+X_moy=Xnaquanti
+ind.na=which(is.na(X_moy),arr.ind=TRUE) #on cherche les indices pour lesquels il y a un NA dans le dataframe
+X_moy[ind.na]=moy[ind.na[,2]] #on remplace les valeurs NA par la moyenne de la colonne correspondante
+gg_miss_var(X_moy)
+
+```
+
+On voit bien qu'on n'a plus aucune valeur NA
+
+Calcul de l'erreur associée
+
+```{r}
+err.moy=(Xquanti-X_moy)[ind.na.C02,2]
+##problème car dim differentes 
+sqrt(mean(err.moy^2))
+boxplot(data.frame(err.moy))
+```
+
+Complétion par la médiane 
+
+```{r}
+med=apply(Xnaquanti,2,median,na.rm=TRUE)
+X.med=Xnaquanti
+ind.na=which(is.na(X.med),arr.ind=TRUE)
+X.med[ind.na]=med[ind.na[,2]]
+gg_miss_var(X.med)
+```
+
+On voit bien qu'on n'a plus aucune valeur NA
+
+Calcul de l'erreur  
+```{r}
+err.med=(Xquanti-X.med)[ind.na.CO2,2]
+sqrt(mean(err.med^2))
+boxplot(data.frame(err.moy, err.med))
+```
+
+Complétion par la valeur de la derniere valeur connue
+
+```{r}
+library(zoo) 
+X.locf=na.locf(Xnaquanti,na.rm=FALSE) #parcours dans un sens 
+X.locf=na.locf(X.locf,na.rm=FALSE,fromLast=TRUE)  #parcours dans l'autre sens 
+gg_miss_var(X.locf)
+```
+
+Il n'y a donc plus de valeur NA
+
+Calcul de l'erreur 
+```{r}
+err.locf=(Xquanti-X.locf)[ind.na.C02,2]
+##problème car dim differentes 
+sqrt(mean(err.locf^2))
+boxplot(data.frame(err.moy, err.locf, err.med))
+```
+
+Complétion par les k plus proches voisins
+
+L'algorithme de complétion KNN (K-Nearest Neighbors) impute les valeurs manquantes en remplaçant chaque valeur manquante par la moyenne ou la médiane des valeurs des k voisins les plus proches dans l'espace des caractéristiques.
+
+L'argument 'k=5' spécifie que pour chaque valeur manquante, l'algorithme kNN utilisera les 5 voisins les plus proches pour estimer la valeur manquante.
+
+```{r}
+library(VIM)
+X.kNN=kNN(Xnaquanti, k=5, imp_var=FALSE) 
+gg_miss_var(X.kNN)
+```
+Calcul de l'erreur associée
+
+```{r}
+err.kNN=(Xquanti-X.kNN)[ind.na.CO2,2]
+sqrt(mean(err.kNN^2))
+boxplot(data.frame(err.moy, err.locf, err.med, err.kNN))
+
+```
+
+Complétion par MissForest
+
+MissForest est une méthode d'imputation des données manquantes qui utilise des forêts aléatoires. Elle remplace les valeurs manquantes en utilisant des prédictions basées sur les données observées dans les autres variables. Ce processus est itératif et se poursuit jusqu'à convergence. 
+
+```{r}
+library(missForest)
+X.mf=missForest(Xnaquanti,xtrue=Xquanti,maxiter=100)
+gg_miss_var(X.mf)
+```
+
+Erreur associée
+```{r}
+err.mf=(Xquanti-X.mf)[ind.na.CO2,2]
+sqrt(mean(err.mf^2))
+boxplot(data.frame(err.moy, err.locf, err.med, err.kNN, err.mf))
+```
+
+Erreur associée
+```{r}
+err.mf=(Xquanti-X.mf$ximp)[ind.na.Temp,2]
+sqrt(mean(err.mf^2))
+boxplot(data.frame(err.moy, err.locf, err.med, err.kNN,err.mf))
+
+```
+
+Complétion avec Amelia II
+
+Cette méthode est appelée méthode de l'imputation multiple et consiste à imputer m valeurs pour chaque cellule manquante dans le dataframe et à créer m ensembles de données "complétées". (les valeurs observées sont les mêmes, mais les valeurs manquantes sont remplies avec différentes imputations).
+
+```{r}
+library(Amelia)
+nb.amelia = 5
+X.amel = amelia(Xnaquanti, m=nb.amelia)
+gg_miss_var(X.amel)
+```
+
+Erreur associée
+```{r}
+err.amel=(Xquanti-X.amel)[ind.na.CO2,2]
+sqrt(mean(err.amel^2))
+boxplot(data.frame(err.moy, err.locf, err.med, err.kNN, err.mf, err.amel))
+```
+
